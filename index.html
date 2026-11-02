@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>人生英雄譚</title>
+  
+  <!-- 引入 Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- 引入 Babel 以在瀏覽器中編譯 JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- 設定 React 與 Lucide 圖示的模組載入路徑 -->
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- 應用程式的根節點 -->
+  <div id="root"></div>
+
+  <!-- 主程式碼 -->
+  <script type="text/babel" data-type="module">
+    import React, { useState, useEffect } from 'react';
+    import { createRoot } from 'react-dom/client';
+    // 新增 Upload 圖示引入
+    import { Pencil, Trash2, Plus, Save, X, Target, Swords, Download, Clock, List, BookOpen, Award, FileText, Star, Sparkles, Upload } from 'lucide-react';
+
+    // ==========================================
+    // 預設資料
+    // ==========================================
+    const defaultQuests = [
+      { id: '1', type: 'main', status: 'completed', title: '第一話：考上普考', description: '展開公職生涯的起點。', date: '2020-10-31', highlight: '獲得穩定發展的基石' },
+      { id: '2', type: 'side', status: 'completed', title: '休刊小憩：買 PS5', description: '慰勞自己的辛苦，體驗次世代遊戲魅力。', date: '2024-03-09', highlight: '獲得寶具：紓壓神器' },
+      { id: '3', type: 'hidden', status: 'completed', title: '獲得小功一次', description: '順利推動跨部門專案，大幅提升行政效率。', date: '2023-11-15', highlight: '專案執行力受長官肯定' },
+      { id: '4', type: 'side', status: 'completed', title: '特別篇：遠征大阪環球影城', description: '抵達充滿歡笑與驚奇的島嶼，挑戰各項刺激設施，補充生命力！', date: '2026-04-07', highlight: '獲得狀態：身心充飽電' }
+    ];
+
+    // ==========================================
+    // 程序化寶物生成器 (薩爾達傳說風格)
+    // ==========================================
+    const TreasureIcon = ({ type, className = "w-12 h-12" }) => {
+      const shapeId = type % 10;
+      const colorId = Math.floor(type / 10) % 8;
+      const emblemId = Math.floor(type / 80) % 8;
+
+      const palettes = [
+        ['#4ade80', '#166534', '#bbf7d0'], // 0: 草/風 (綠)
+        ['#f87171', '#7f1d1d', '#fecaca'], // 1: 火/力 (紅)
+        ['#60a5fa', '#1e3a8a', '#bfdbfe'], // 2: 水/冰 (藍)
+        ['#facc15', '#854d0e', '#fef08a'], // 3: 光/雷 (黃)
+        ['#c084fc', '#581c87', '#e9d5ff'], // 4: 暗/毒 (紫)
+        ['#fb923c', '#7c2d12', '#fed7aa'], // 5: 地/岩 (橘)
+        ['#2dd4bf', '#134e4a', '#ccfbf1'], // 6: 希卡科技 (青)
+        ['#94a3b8', '#334155', '#e2e8f0'], // 7: 鐵/無屬性 (銀)
+      ];
+      const [main, stroke, highlight] = palettes[colorId];
+
+      const renderShape = () => {
+        switch (shapeId) {
+          case 0: return <polygon points="50,10 80,35 80,65 50,90 20,65 20,35" fill={main} stroke={stroke} strokeWidth="4" strokeLinejoin="round"/>; 
+          case 1: return <path d="M 50,85 C 50,85 10,55 10,30 C 10,15 25,5 40,15 C 50,25 50,25 50,25 C 50,25 50,25 60,15 C 75,5 90,15 90,30 C 90,55 50,85 50,85 Z" fill={main} stroke={stroke} strokeWidth="4" strokeLinejoin="round"/>;
+          case 2: return <polygon points="50,15 85,85 15,85" fill={main} stroke={stroke} strokeWidth="4" strokeLinejoin="round"/>;
+          case 3: return <path d="M 15,20 Q 50,10 85,20 L 85,50 Q 85,85 50,95 Q 15,85 15,50 Z" fill={main} stroke={stroke} strokeWidth="4" strokeLinejoin="round"/>;
+          case 4: return <><circle cx="50" cy="55" r="35" fill={main} stroke={stroke} strokeWidth="4"/><path d="M 50,20 Q 60,5 70,10" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round"/><circle cx="70" cy="10" r="4" fill="#ef4444"/></>;
+          case 5: return <path d="M 50,95 L 50,85 C 10,85 10,25 50,15 C 90,25 90,85 50,85 Z" fill={main} stroke={stroke} strokeWidth="4" strokeLinejoin="round"/>;
+          case 6: return <path d="M 50,10 Q 80,50 80,70 A 30 30 0 0 1 20,70 Q 20,50 50,10 Z" fill={main} stroke={stroke} strokeWidth="4" strokeLinejoin="round"/>;
+          case 7: return <polygon points="50,15 85,35 85,75 50,95 15,75 15,35" fill={main} stroke={stroke} strokeWidth="4" strokeLinejoin="round"/>;
+          case 8: return <><path d="M 35,35 L 65,35 L 75,55 L 75,90 L 25,90 L 25,55 Z" fill={main} stroke={stroke} strokeWidth="4"/><rect x="40" y="10" width="20" height="25" fill={main} stroke={stroke} strokeWidth="4"/><line x1="35" y1="20" x2="65" y2="20" stroke={stroke} strokeWidth="4" strokeLinecap="round"/></>;
+          case 9: return <polygon points="50,10 60,40 90,50 60,60 50,90 40,60 10,50 40,40" fill={main} stroke={stroke} strokeWidth="4" strokeLinejoin="round"/>;
+          default: return <circle cx="50" cy="50" r="35" fill={main} stroke={stroke} strokeWidth="4"/>;
+        }
+      };
+
+      const renderEmblem = () => {
+        switch (emblemId) {
+          case 0: return <polygon points="35,35 45,35 35,45" fill={highlight} opacity="0.8"/>;
+          case 1: return <polygon points="50,35 65,60 35,60" fill="none" stroke={stroke} strokeWidth="4" strokeLinejoin="round"/>;
+          case 2: return <><path d="M 35,50 Q 50,35 65,50 Q 50,65 35,50 Z" fill="none" stroke={stroke} strokeWidth="3"/><circle cx="50" cy="50" r="4" fill={stroke}/><line x1="50" y1="55" x2="50" y2="65" stroke={stroke} strokeWidth="3"/></>;
+          case 3: return <path d="M 50,50 C 60,50 60,40 50,40 C 35,40 35,60 50,60 C 70,60 70,30 50,30" fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round"/>;
+          case 4: return <><circle cx="50" cy="50" r="8" fill="none" stroke={stroke} strokeWidth="4"/><line x1="50" y1="35" x2="50" y2="65" stroke={stroke} strokeWidth="3"/><line x1="35" y1="50" x2="65" y2="50" stroke={stroke} strokeWidth="3"/></>;
+          case 5: return <polygon points="55,35 45,55 55,55 45,75 60,50 50,50" fill={highlight} stroke={stroke} strokeWidth="2" strokeLinejoin="round"/>;
+          case 6: return <path d="M 50,35 C 65,55 60,70 50,70 C 40,70 35,55 50,35 Z" fill={highlight} stroke={stroke} strokeWidth="2" strokeLinejoin="round"/>;
+          case 7: return <path d="M 55,35 A 15 15 0 1 0 55,65 A 12 12 0 1 1 55,35 Z" fill={stroke}/>;
+          default: return null;
+        }
+      };
+
+      return (
+        <svg viewBox="0 0 100 100" className={className}>
+          {renderShape()}
+          {renderEmblem()}
+        </svg>
+      );
+    };
+
+    const getTreasureType = (text) => {
+      if (!text) return 0;
+      let hash = 0;
+      for (let i = 0; i < text.length; i++) {
+        hash = (hash << 5) - hash + text.charCodeAt(i);
+        hash = hash & hash; 
+      }
+      hash = Math.abs(hash);
+
+      let shapeId = hash % 10;
+      if (/(錢|買|消費|紓壓|盧比|財富|PS5)/.test(text)) shapeId = 0;      
+      else if (/(心|血|命|休息|充飽電|療癒|健康)/.test(text)) shapeId = 1; 
+      else if (/(神|力|王|霸|無敵|極致)/.test(text)) shapeId = 2;          
+      else if (/(穩|防|盾|基石|基礎|安全|保障)/.test(text)) shapeId = 3;    
+      else if (/(破|爆|衝|炸|驚|突發)/.test(text)) shapeId = 4;            
+      else if (/(小|果|找|發現|幸運|種子|巧合)/.test(text)) shapeId = 5;    
+      else if (/(水|淚|滴|海|泉|流)/.test(text)) shapeId = 6;              
+      else if (/(礦|石|晶|硬|六角)/.test(text)) shapeId = 7;              
+      else if (/(藥|瓶|魔法|治|毒)/.test(text)) shapeId = 8;              
+      else if (/(星|功|獎|肯定|証|成就|榮譽|讚賞)/.test(text)) shapeId = 9; 
+
+      const colorId = (hash >> 2) % 8;
+      const emblemId = (hash >> 4) % 8;
+
+      return emblemId * 80 + colorId * 10 + shapeId;
+    };
+
+    // ==========================================
+    // Patapon 風格頭像組件
+    // ==========================================
+    const PataponAvatar = () => (
+      <svg viewBox="0 0 100 100" className="w-full h-full bg-[#E8DCC4]" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="42" fill="#D5C5A3" />
+        <line x1="60" y1="80" x2="95" y2="15" stroke="#111" strokeWidth="3" strokeLinecap="round" />
+        <polygon points="95,15 100,5 88,10" fill="#111" />
+        <line x1="88" y1="20" x2="98" y2="15" stroke="#111" strokeWidth="2" strokeLinecap="round" />
+        <path d="M 50,35 Q 40,5 15,10 Q 30,25 42,35 Z" fill="#EF4444" />
+        <circle cx="50" cy="55" r="22" fill="#111" />
+        <circle cx="50" cy="55" r="12" fill="#fff" />
+        <circle cx="50" cy="55" r="6" fill="#111" />
+        <path d="M 42,75 L 35,90 L 25,90" fill="none" stroke="#111" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M 58,75 L 65,90 L 75,90" fill="none" stroke="#111" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M 68,60 Q 75,65 80,60" fill="none" stroke="#111" strokeWidth="4" strokeLinecap="round" />
+        <path d="M 32,60 Q 20,65 15,60" fill="none" stroke="#111" strokeWidth="4" strokeLinecap="round" />
+        <circle cx="15" cy="58" r="10" fill="#fff" stroke="#111" strokeWidth="3" />
+        <circle cx="15" cy="58" r="2" fill="#111" />
+        <path d="M 15,48 L 15,68 M 5,58 L 25,58" stroke="#111" strokeWidth="2" opacity="0.3" />
+      </svg>
+    );
+
+    // ==========================================
+    // 主應用程式 (移除 export default)
+    // ==========================================
+    function App() {
+      const [quests, setQuests] = useState([]);
+      const [editingItem, setEditingItem] = useState(null);
+      const [activeTab, setActiveTab] = useState('timeline');
+      const [currentTime, setCurrentTime] = useState(new Date());
+
+      const [basicInfo, setBasicInfo] = useState({ birth: '1989-05-10', education: '', experience: '' });
+      const [isBasicInfoModalOpen, setIsBasicInfoModalOpen] = useState(false);
+      const [expandedHiddenQuestId, setExpandedHiddenQuestId] = useState(null);
+      const [isTreasureDexOpen, setIsTreasureDexOpen] = useState(false);
+
+      // ======== 新增：實體 JSON 存檔與讀檔功能 ========
+      const exportData = () => {
+        const dataToSave = { quests, basicInfo };
+        const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `人生英雄譚_存檔_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      };
+
+      const triggerImport = () => {
+        document.getElementById('import-file').click();
+      };
+
+      const handleImportData = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const importedData = JSON.parse(event.target.result);
+            if (importedData.quests) {
+              setQuests(importedData.quests);
+              saveQuestsToLocal(importedData.quests);
+            }
+            if (importedData.basicInfo) {
+              setBasicInfo(importedData.basicInfo);
+              try { localStorage.setItem('mangaBasicInfoV9', JSON.stringify(importedData.basicInfo)); } catch (err) {}
+            }
+            alert('讀檔成功！歡迎回到英雄譚！✨');
+          } catch (err) {
+            alert('存檔格式錯誤或檔案損毀。(バシッ⚡)');
+          }
+          e.target.value = null; // 重置 input 以便下次可重複選擇同檔案
+        };
+        reader.readAsText(file);
+      };
+      // ====================================================
+
+      useEffect(() => {
+        // 在 Google 協作平台等沙盒環境中，localStorage 可能會有存取限制，加上 try-catch 防呆
+        try {
+          const savedQuests = localStorage.getItem('mangaQuestsV9');
+          if (savedQuests) setQuests(JSON.parse(savedQuests));
+          else setQuests(defaultQuests);
+
+          const savedBasicInfo = localStorage.getItem('mangaBasicInfoV9');
+          if (savedBasicInfo) {
+            const parsed = JSON.parse(savedBasicInfo);
+            setBasicInfo({
+              birth: parsed.birth || '1989-05-10',
+              education: parsed.education || '',
+              experience: parsed.experience || ''
+            });
+          }
+        } catch (e) {
+          console.warn("Storage access restricted.", e);
+          setQuests(defaultQuests);
+        }
+
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+      }, []);
+
+      const saveQuestsToLocal = (data) => {
+        try {
+          localStorage.setItem('mangaQuestsV9', JSON.stringify(data));
+        } catch (e) {
+          console.warn("Failed to save to localStorage.", e);
+        }
+        setQuests(data);
+      };
+
+      const handleBasicInfoSave = () => {
+        try {
+          localStorage.setItem('mangaBasicInfoV9', JSON.stringify(basicInfo));
+        } catch (e) {}
+        setIsBasicInfoModalOpen(false);
+      };
+
+      const openEdit = (quest = null, defaultType = 'main') => {
+        if (quest) {
+          setEditingItem({ ...quest });
+        } else {
+          setEditingItem({
+            id: Date.now().toString(),
+            type: defaultType, status: 'completed', title: '', description: '', date: new Date().toISOString().slice(0, 10), highlight: ''
+          });
+        }
+      };
+
+      const handleQuestSave = () => {
+        if (!editingItem.title.trim()) { alert('標題不能為空！(バシッ⚡)'); return; }
+        const isNew = !quests.find(q => q.id === editingItem.id);
+        const newData = isNew ? [...quests, editingItem] : quests.map(q => q.id === editingItem.id ? editingItem : q);
+        saveQuestsToLocal(newData);
+        setEditingItem(null);
+      };
+
+      const handleQuestDelete = (id) => {
+        if (window.confirm('確定要捨棄這個分鏡嗎？(ドーン💥)')) {
+          saveQuestsToLocal(quests.filter(q => q.id !== id));
+          setEditingItem(null);
+        }
+      };
+      
+      const exportWord = () => {
+        const content = document.getElementById('export-template').innerHTML;
+        const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>履歷匯出</title><style>body { font-family: "Microsoft JhengHei", sans-serif; line-height: 1.6; } h1, h2, h3 { color: #333; } .date { color: #666; font-size: 0.9em; }</style></head><body>${content}</body></html>`;
+        const url = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(html);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = '人生英雄譚_自傳履歷.doc';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      const sortedQuests = [...quests].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const mainQuests = sortedQuests.filter(q => q.type === 'main');
+      const sideQuests = sortedQuests.filter(q => q.type === 'side');
+      const hiddenQuests = sortedQuests.filter(q => q.type === 'hidden');
+      
+      const highlightedQuests = sortedQuests.filter(q => q.highlight && q.highlight.trim() !== '');
+      const collectedTreasureTypes = Array.from(new Set(highlightedQuests.map(q => getTreasureType(q.highlight))));
+
+      return (
+        <>
+          <style>{`
+            @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+            ::-webkit-scrollbar { width: 12px; }
+            ::-webkit-scrollbar-track { background: #f3f4f6; border-left: 2px solid #000; }
+            ::-webkit-scrollbar-thumb { background: #000; border: 2px solid #f3f4f6; }
+            ::-webkit-scrollbar-thumb:hover { background: #333; }
+          `}</style>
+
+          <div className="min-h-screen font-serif text-black print:hidden flex overflow-hidden relative selection:bg-gray-300"
+               style={{ backgroundColor: '#fff', backgroundImage: 'radial-gradient(#b0b0b0 2px, transparent 2px)', backgroundSize: '16px 16px', backgroundAttachment: 'fixed' }}>
+            
+            {/* --- 左側系統導航列 --- */}
+            <div className="w-64 bg-white border-r-[6px] border-black flex flex-col z-20 shadow-[8px_0_0_0_rgba(0,0,0,1)] relative font-sans shrink-0">
+              <div className="p-6 pb-8 border-b-[4px] border-black flex flex-col items-center bg-gray-100">
+                <div className="w-28 h-28 bg-slate-900 border-[4px] border-black mb-4 flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transform -rotate-2 overflow-hidden relative">
+                     <div className="w-full h-full transition-all duration-300 bg-white flex items-center justify-center">
+                       <PataponAvatar />
+                     </div>
+                </div>
+                
+                <h2 
+                  className="text-xl font-black tracking-widest text-black bg-white px-4 py-1 border-2 border-black transform rotate-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:bg-gray-200 hover:-translate-y-0.5 transition-all flex items-center gap-1 group relative z-10"
+                  onClick={() => setIsBasicInfoModalOpen(true)}
+                  title="點擊編輯基本資料"
+                >
+                  主角 <Pencil size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                </h2>
+                <div className="flex items-center gap-1 text-xs font-bold mt-3 bg-black text-white px-2 py-0.5 relative z-10">
+                  <BookOpen size={12} /> 連載中
+                </div>
+              </div>
+
+              <div className="flex-1 py-6 px-4 space-y-3 bg-white">
+                <div className="text-sm font-black uppercase tracking-widest border-l-4 border-black pl-2 mb-2">目錄</div>
+                <button onClick={() => setActiveTab('timeline')} className={`w-full flex items-center gap-3 px-4 py-3 font-black transition-all duration-300 border-[3px] border-black ${activeTab === 'timeline' ? 'bg-black text-white shadow-[4px_4px_0px_0px_rgba(100,100,100,1)] transform -translate-y-1' : 'bg-white text-black hover:bg-gray-100 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}`}>
+                  <Clock size={20} strokeWidth={2.5} /> <span className="tracking-widest">時間軸</span>
+                </button>
+                <button onClick={() => setActiveTab('list')} className={`w-full flex items-center gap-3 px-4 py-3 font-black transition-all duration-300 border-[3px] border-black ${activeTab === 'list' ? 'bg-black text-white shadow-[4px_4px_0px_0px_rgba(100,100,100,1)] transform -translate-y-1' : 'bg-white text-black hover:bg-gray-100 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}`}>
+                  <List size={20} strokeWidth={2.5} /> <span className="tracking-widest">設定集</span>
+                </button>
+                <button onClick={() => setActiveTab('highlight')} className={`w-full flex items-center gap-3 px-4 py-3 font-black transition-all duration-300 border-[3px] border-black ${activeTab === 'highlight' ? 'bg-black text-white shadow-[4px_4px_0px_0px_rgba(100,100,100,1)] transform -translate-y-1' : 'bg-white text-black hover:bg-gray-100 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}`}>
+                  <Sparkles size={20} strokeWidth={2.5} /> <span className="tracking-widest">稱號</span>
+                </button>
+
+                <div className="text-sm font-black uppercase tracking-widest border-l-4 border-black pl-2 mt-10 mb-2">系統</div>
+            <button onClick={() => openEdit(null)} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-dashed border-black font-bold hover:bg-gray-100 transition-all">
+              <Plus size={18} strokeWidth={3} /> <span className="tracking-widest">新增劇情</span>
+            </button>
+            <button onClick={exportWord} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-black text-white hover:bg-gray-800 transition-all shadow-[2px_2px_0px_0px_rgba(100,100,100,1)]">
+              <FileText size={18} strokeWidth={2.5} /> <span className="tracking-widest">輸出履歷</span>
+            </button>
+
+            {/* 新增備份管理區塊 */}
+            <div className="text-sm font-black uppercase tracking-widest border-l-4 border-black pl-2 mt-8 mb-2">備份管理</div>
+            <button onClick={exportData} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-blue-100 hover:bg-blue-200 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              <Download size={18} strokeWidth={2.5} /> <span className="tracking-widest">下載存檔 (備份)</span>
+            </button>
+            <button onClick={triggerImport} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-green-100 hover:bg-green-200 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] mt-2">
+              <Upload size={18} strokeWidth={2.5} /> <span className="tracking-widest">讀取存檔 (還原)</span>
+            </button>
+            
+            {/* 隱藏的檔案上傳元素 */}
+            <input type="file" id="import-file" accept=".json" style={{ display: 'none' }} onChange={handleImportData} />
+          </div>
+        </div>
+
+        {/* --- 右側內容顯示區 --- */}
+            <div className="flex-1 flex flex-col h-screen overflow-hidden relative z-10">
+              <div className="h-16 w-full flex items-center justify-end px-8 pt-4 shrink-0">
+                <div className="flex items-center gap-3 text-black font-black text-sm bg-white border-4 border-black px-4 py-1.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transform rotate-1 tracking-widest">
+                  <span>{currentTime.toLocaleDateString('zh-TW')}</span>
+                  <span>{currentTime.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                </div>
+              </div>
+
+              <div className="flex-1 flex flex-col p-4 md:p-8 xl:p-12 animate-[scaleIn_0.3s_ease-out] overflow-hidden">
+                
+                {/* ================= 時間軸模式 ================= */}
+                {activeTab === 'timeline' && (
+                  <div className="max-w-6xl mx-auto w-full flex flex-col h-full relative">
+                    <div className="shrink-0 mb-8 pt-2">
+                      <div className="inline-block bg-white border-[6px] border-black p-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transform -rotate-2 relative z-20">
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10">
+                           <div className="w-[200%] h-[200%] absolute bg-[conic-gradient(from_0deg,transparent_0deg,black_2deg,transparent_4deg)] animate-[spin_60s_linear_infinite]"></div>
+                        </div>
+                        <h1 className="text-4xl md:text-5xl font-black tracking-widest text-black font-serif relative z-10">生涯時間軸</h1>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto pr-4 font-sans relative">
+                      <div className="relative min-h-full pb-20 pt-4 flex flex-col">
+                        <div className="absolute left-1/2 top-0 bottom-0 w-2 bg-black transform -translate-x-1/2 z-0 border-x-2 border-white"></div>
+                        
+                        {sortedQuests.length === 0 && <p className="text-center font-black bg-white border-4 border-black inline-block px-6 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative z-10 self-center mb-12">尚未開始連載</p>}
+                        
+                        {sortedQuests.map((q, idx) => {
+                          const isMain = q.type === 'main';
+                          const isHidden = q.type === 'hidden';
+                          
+                          if (isHidden) {
+                            const isExpanded = expandedHiddenQuestId === q.id;
+                            return (
+                              <div key={q.id} className="relative flex flex-col items-center justify-center w-full min-h-[100px] mb-8 z-30">
+                                 <button onClick={() => setExpandedHiddenQuestId(isExpanded ? null : q.id)} className="bg-white px-3 py-1.5 border-[3px] border-black rounded-full font-black tracking-widest text-yellow-500 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transform hover:scale-125 transition-all z-20 hover:text-yellow-600 focus:outline-none">
+                                   キラッ✨
+                                 </button>
+                                 {isExpanded && (
+                                   <div className="absolute top-16 bg-white border-4 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] z-40 w-[80%] max-w-sm transform animate-[scaleIn_0.2s_ease-out]">
+                                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[10px] border-r-[10px] border-b-[12px] border-l-transparent border-r-transparent border-b-black"></div>
+                                      <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[8px] border-l-transparent border-r-transparent border-b-white"></div>
+                                      <div className="flex justify-between items-start mb-2">
+                                        <h4 className="font-black text-lg text-yellow-600 tracking-wider flex items-center gap-1"><Award size={16} strokeWidth={3} /> {q.title}</h4>
+                                        <button onClick={() => setExpandedHiddenQuestId(null)} className="text-gray-400 hover:text-black"><X size={16} strokeWidth={3} /></button>
+                                      </div>
+                                      <p className="text-sm font-bold text-gray-700 mb-2">{q.date.replace(/-/g, '/')}</p>
+                                      <p className="text-sm font-bold text-gray-800">{q.description}</p>
+                                   </div>
+                                 )}
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={q.id} className="relative flex items-center w-full min-h-[140px] mb-12 group z-10">
+                              <div className={`absolute text-2xl font-black text-gray-300 pointer-events-none z-0 transform transition-all group-hover:scale-110 group-hover:text-black ${isMain ? '-top-6 -left-4 -rotate-12' : '-bottom-6 -right-4 rotate-12'}`}>
+                                {isMain ? 'ゴゴゴゴ...' : 'ドドン!!'}
+                              </div>
+                              
+                              <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center justify-center w-12 h-12 bg-white rounded-full border-[4px] border-black z-20 group-hover:scale-110 transition-transform duration-300 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                                <div className={`w-5 h-5 rounded-full ${isMain ? 'bg-black' : 'bg-gray-400 border-2 border-black'}`}></div>
+                              </div>
+                              
+                              <div className={`w-1/2 pr-8 md:pr-16 flex justify-end ${!isMain ? 'invisible' : 'visible'}`}>
+                                {isMain && (
+                                  <div onClick={() => openEdit(q)} className="w-full md:w-[95%] xl:w-[90%] p-6 md:p-8 bg-white border-[6px] border-black shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] group-hover:shadow-[15px_15px_0px_0px_rgba(0,0,0,1)] group-hover:-translate-y-2 transition-all duration-300 relative overflow-hidden transform rotate-1 cursor-pointer">
+                                     <div className="inline-block bg-black text-white text-sm md:text-base font-black px-3 py-1 mb-4 tracking-widest border-2 border-black shadow-[2px_2px_0px_0px_rgba(255,255,255,1)]">{q.date.replace(/-/g, '/')}</div>
+                                     <div className="flex items-center gap-3"><Target size={32} strokeWidth={3} /><h3 className="text-2xl md:text-3xl font-black tracking-widest text-black">{q.title}</h3></div>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className={`w-1/2 pl-8 md:pl-16 flex justify-start absolute right-0 ${isMain ? 'invisible' : 'visible'}`}>
+                                {!isMain && (
+                                  <div onClick={() => openEdit(q)} className="w-full md:w-[80%] xl:w-[70%] p-5 bg-white border-[4px] border-gray-600 shadow-[6px_6px_0px_0px_rgba(75,85,99,1)] group-hover:border-black group-hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] group-hover:-translate-y-1 transition-all duration-300 relative transform -rotate-1 cursor-pointer">
+                                     <div className="text-sm font-black text-gray-600 mb-2 tracking-widest group-hover:text-black">{q.date.replace(/-/g, '/')}</div>
+                                     <div className="flex items-center gap-2"><Swords size={20} strokeWidth={3} className="text-gray-600 group-hover:text-black" /><h3 className="text-lg md:text-xl font-black tracking-widest text-gray-800 group-hover:text-black">{q.title}</h3></div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ================= 詳細清單模式 ================= */}
+                {activeTab === 'list' && (
+                  <div className="max-w-6xl mx-auto w-full flex flex-col h-full font-sans">
+                    <div className="shrink-0 mb-8 pt-2">
+                      <div className="inline-block bg-white border-[6px] border-black p-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transform rotate-1">
+                        <h1 className="text-3xl md:text-4xl font-black tracking-widest text-black font-serif">設定集</h1>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto pr-4 pb-20">
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
+                        <div>
+                          <h2 className="text-2xl font-black mb-6 flex items-center gap-2 bg-black text-white p-3 inline-flex tracking-widest border-4 border-white shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"><Target size={28} strokeWidth={3} /> 【主線】重要目標</h2>
+                          <div className="space-y-6">
+                            {mainQuests.map(q => (
+                              <div key={q.id} onClick={() => openEdit(q)} className="bg-white border-[4px] border-black p-5 cursor-pointer hover:bg-gray-100 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all">
+                                <div className="flex justify-between items-start mb-3 border-b-[3px] border-black pb-2"><h3 className="text-xl font-black tracking-widest">{q.title}</h3><span className="text-sm font-black bg-black text-white px-2 py-1 border-2 border-black">{q.date}</span></div>
+                                <p className="font-bold text-gray-800 mb-2">{q.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                           <h2 className="text-2xl font-black mb-6 flex items-center gap-2 bg-gray-200 text-black p-3 inline-flex tracking-widest border-4 border-black shadow-[6px_6px_0px_0px_rgba(100,100,100,1)]"><Swords size={28} strokeWidth={3} /> 【副本】小成就</h2>
+                          <div className="space-y-4">
+                            {sideQuests.map(q => (
+                              <div key={q.id} onClick={() => openEdit(q)} className="bg-white border-[3px] border-gray-500 p-4 cursor-pointer hover:border-black hover:bg-gray-50 shadow-[4px_4px_0px_0px_rgba(100,100,100,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all">
+                                <div className="flex justify-between items-start mb-2 border-b-2 border-gray-300 pb-2"><h3 className="text-lg font-black tracking-wider text-gray-800">{q.title}</h3><span className="text-xs font-black bg-gray-200 border-2 border-gray-500 px-2 py-1">{q.date}</span></div>
+                                <p className="text-sm font-bold text-gray-700 mb-2">{q.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-16 border-t-8 border-black border-dotted pt-12">
+                        <h2 className="text-2xl font-black mb-6 flex items-center gap-2 bg-yellow-300 text-black p-3 inline-flex tracking-widest border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transform -rotate-1"><Award size={28} strokeWidth={3} /> 【隱藏】榮譽與獎勵</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                          {hiddenQuests.map(q => (
+                            <div key={q.id} onClick={() => openEdit(q)} className="bg-white border-[3px] border-yellow-500 p-4 cursor-pointer hover:border-black hover:bg-yellow-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 transition-all">
+                              <div className="flex justify-between items-start mb-2 border-b-2 border-yellow-300 pb-2"><h3 className="text-lg font-black tracking-wider text-gray-800">{q.title}</h3><span className="text-xs font-black bg-yellow-100 border-2 border-yellow-500 px-2 py-1">{q.date}</span></div>
+                              <p className="text-sm font-bold text-gray-700 mb-2">{q.description}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ================= 稱號展示模式 ================= */}
+                {activeTab === 'highlight' && (
+                  <div className="max-w-6xl mx-auto w-full flex flex-col h-full font-sans relative">
+                    
+                    {isTreasureDexOpen && (
+                      <div className="absolute top-20 right-4 z-50 bg-white border-[4px] border-black p-6 shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] w-80 animate-[scaleIn_0.2s_ease-out]">
+                        <div className="flex justify-between items-center mb-4 border-b-4 border-black pb-2">
+                          <h3 className="text-xl font-black flex items-center gap-2"><Sparkles size={24} /> 已發掘的寶物</h3>
+                          <button onClick={() => setIsTreasureDexOpen(false)} className="hover:text-gray-500"><X size={24} strokeWidth={3} /></button>
+                        </div>
+                        {collectedTreasureTypes.length === 0 ? (
+                           <p className="text-center font-bold text-gray-500 py-4">空空如也，快去探險吧！</p>
+                        ) : (
+                           <div className="grid grid-cols-4 gap-4 max-h-[300px] overflow-y-auto pr-2">
+                             {collectedTreasureTypes.map(type => (
+                               <div key={`dex-${type}`} className="flex flex-col items-center group cursor-help">
+                                  <div className="w-12 h-12 bg-gray-100 border-2 border-black p-1 rounded-md group-hover:scale-110 transition-transform shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                                    <TreasureIcon type={type} className="w-full h-full" />
+                                  </div>
+                               </div>
+                             ))}
+                           </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="shrink-0 mb-6 pt-2 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                      <div className="inline-block bg-white border-[6px] border-black p-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transform -rotate-1">
+                        <h1 className="text-3xl md:text-4xl font-black tracking-widest text-black font-serif flex items-center gap-3">
+                          <Star size={36} fill="black" /> 稱號牆
+                        </h1>
+                      </div>
+                      
+                      <div className="bg-white border-[3px] border-black px-4 py-2 flex items-center gap-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-40">
+                        <span className="font-black text-gray-700 tracking-widest">已發掘的神祕圖示：</span>
+                        <span className="text-2xl font-black bg-black text-white px-3 py-1 mr-2">{collectedTreasureTypes.length} 種</span>
+                        <button 
+                          onClick={() => setIsTreasureDexOpen(!isTreasureDexOpen)}
+                          className={`p-2 border-2 border-black rounded-full transition-all duration-300 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:outline-none ${isTreasureDexOpen ? 'bg-yellow-300' : 'bg-gray-100 hover:bg-yellow-200 hover:-translate-y-1'}`}
+                          title="點擊查看寶物圖鑑"
+                        >
+                          <Sparkles size={24} className={isTreasureDexOpen ? 'text-black' : 'text-gray-800'} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto pr-4 pb-20 pt-8 mt-2">
+                      {highlightedQuests.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                          <Sparkles size={64} strokeWidth={1} className="mb-4 opacity-50" />
+                          <p className="text-xl font-black tracking-widest">目前尚未獲得任何稱號與寶物</p>
+                          <p className="mt-2 font-bold">在編輯任務時填寫「獲得稱號」即可發掘傳說！</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 gap-y-12">
+                          {highlightedQuests.map(q => {
+                            const tType = getTreasureType(q.highlight);
+                            return (
+                              <div key={`hl-${q.id}`} className="bg-white border-[4px] border-black p-6 relative group transform transition-transform hover:-translate-y-2 hover:rotate-1 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] mt-2 cursor-pointer" onClick={() => openEdit(q)}>
+                                <div className="absolute -top-8 -right-6 bg-white border-4 border-black p-3 rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-10 transform group-hover:scale-110 transition-transform bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-100 to-white">
+                                   <TreasureIcon type={tType} className="w-10 h-10" />
+                                </div>
+                                
+                                <div className="mb-4 border-b-[3px] border-black border-dashed pb-4">
+                                  <p className="text-sm font-black text-gray-500 mb-1 flex items-center justify-between">
+                                    <span>來自：{q.type === 'main' ? '【主線】' : q.type === 'side' ? '【副本】' : '【隱藏】'}</span>
+                                    <span className="bg-gray-100 border-2 border-black px-2">{q.date}</span>
+                                  </p>
+                                  <h4 className="font-bold text-gray-800 line-clamp-1 pr-8">{q.title}</h4>
+                                </div>
+                                
+                                <div className="flex flex-col items-center text-center justify-center pt-2">
+                                  <span className="text-xs font-black tracking-widest text-gray-400 mb-2">— 獲得稱號 —</span>
+                                  <h3 className="text-2xl font-black text-black tracking-wider leading-tight">{q.highlight}</h3>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ================= 任務編輯彈窗 ================= */}
+            {editingItem && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setEditingItem(null)}></div>
+                <div className="relative bg-white border-[6px] border-black w-full max-w-2xl shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-black animate-[scaleIn_0.2s_ease-out] font-sans h-auto max-h-[90vh] overflow-y-auto">
+                  <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 2px, transparent 2px)', backgroundSize: '16px 16px' }}></div>
+                  <div className="p-6 md:p-8 space-y-6 relative z-10 bg-white/95">
+                    <h2 className="text-2xl font-black tracking-widest flex items-center gap-2 border-b-4 border-black pb-2 inline-block"><Pencil size={24} strokeWidth={3} /> {quests.find(q => q.id === editingItem.id) ? '重新作畫' : '新增分鏡'}</h2>
+                    <div className="space-y-5">
+                      <div className="flex flex-wrap gap-3">
+                        <label className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 p-3 border-4 border-black font-black cursor-pointer transition-all ${editingItem.type === 'main' ? 'bg-black text-white shadow-[4px_4px_0px_0px_rgba(100,100,100,1)]' : 'bg-white'}`}><input type="radio" className="hidden" checked={editingItem.type === 'main'} onChange={() => setEditingItem({...editingItem, type: 'main'})} /> <Target size={20}/> 主任務</label>
+                        <label className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 p-3 border-4 border-gray-400 font-black cursor-pointer transition-all ${editingItem.type === 'side' ? 'bg-gray-200 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]' : 'bg-white'}`}><input type="radio" className="hidden" checked={editingItem.type === 'side'} onChange={() => setEditingItem({...editingItem, type: 'side'})} /> <Swords size={20}/> 副本</label>
+                        <label className={`flex-1 min-w-[120px] flex items-center justify-center gap-1.5 p-3 border-4 border-yellow-500 font-black cursor-pointer transition-all ${editingItem.type === 'hidden' ? 'bg-yellow-300 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]' : 'bg-white'}`}><input type="radio" className="hidden" checked={editingItem.type === 'hidden'} onChange={() => setEditingItem({...editingItem, type: 'hidden'})} /> <Award size={20}/> 隱藏</label>
+                      </div>
+                      <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-[2]"><label className="block font-black mb-1">標題</label><input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-bold" value={editingItem.title} onChange={e => setEditingItem({...editingItem, title: e.target.value})} /></div>
+                        <div className="flex-1"><label className="block font-black mb-1">日期</label><input type="date" className="w-full bg-gray-50 border-2 border-black p-2 font-bold" value={editingItem.date} onChange={e => setEditingItem({...editingItem, date: e.target.value})} /></div>
+                      </div>
+                      <div><label className="block font-black mb-1">詳細劇情</label><textarea className="w-full h-24 bg-gray-50 border-2 border-black p-2 font-bold resize-none" value={editingItem.description} onChange={e => setEditingItem({...editingItem, description: e.target.value})} /></div>
+                      <div><label className="block font-black mb-1">獲得稱號</label><input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-bold" value={editingItem.highlight} onChange={e => setEditingItem({...editingItem, highlight: e.target.value})} placeholder="例如：紓壓神器、身心充飽電..." /></div>
+                    </div>
+                    <div className="flex justify-between mt-8 pt-6 border-t-[4px] border-black border-dashed">
+                      {quests.find(q => q.id === editingItem.id) ? <button onClick={() => handleQuestDelete(editingItem.id)} className="font-black text-gray-500 hover:text-black flex items-center gap-1"><Trash2 size={18}/> 刪除</button> : <div></div>}
+                      <div className="flex gap-4">
+                        <button onClick={() => setEditingItem(null)} className="font-black px-4 py-2 border-4 border-black hover:bg-gray-200 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">取消</button>
+                        <button onClick={handleQuestSave} className="font-black px-6 py-2 bg-black text-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(100,100,100,1)]">存檔 !</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ================= 基本資料編輯彈窗 ================= */}
+            {isBasicInfoModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsBasicInfoModalOpen(false)}></div>
+                <div className="relative bg-white border-[6px] border-black w-full max-w-xl flex flex-col shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-black animate-[scaleIn_0.2s_ease-out] font-sans h-auto max-h-[90vh]">
+                  <div className="p-6 border-b-4 border-black flex justify-between items-center bg-gray-100"><h2 className="text-2xl font-black flex items-center gap-2"><FileText size={28}/> 主角基本設定</h2><button onClick={() => setIsBasicInfoModalOpen(false)}><X size={24}/></button></div>
+                  <div className="p-6 space-y-5">
+                      <div><label className="block font-black mb-1">出生年月日</label><input type="date" className="w-full bg-gray-50 border-2 border-black p-3 font-bold" value={basicInfo.birth} onChange={e => setBasicInfo({...basicInfo, birth: e.target.value})} /></div>
+                      <div><label className="block font-black mb-1">學歷</label><textarea className="w-full h-24 bg-gray-50 border-2 border-black p-3 font-bold resize-none" value={basicInfo.education} onChange={e => setBasicInfo({...basicInfo, education: e.target.value})} placeholder="例如：國立某某大學 某某學系&#10;某某高中..." /></div>
+                      <div><label className="block font-black mb-1">經歷</label><textarea className="w-full h-24 bg-gray-50 border-2 border-black p-3 font-bold resize-none" value={basicInfo.experience} onChange={e => setBasicInfo({...basicInfo, experience: e.target.value})} placeholder="例如：某某機關 交通工程科股長..." /></div>
+                  </div>
+                  <div className="p-6 border-t-4 border-black bg-gray-100 flex justify-end gap-4"><button onClick={() => setIsBasicInfoModalOpen(false)} className="font-black px-6 py-2 border-4 border-black hover:bg-gray-200">取消</button><button onClick={handleBasicInfoSave} className="font-black px-8 py-2 bg-black text-white border-4 border-black">儲存設定</button></div>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* ======== 【列印用：傳統白底黑字履歷模板】 ======== */}
+          <div id="export-template" className="hidden print:block font-sans max-w-[800px] mx-auto p-8 text-black bg-white">
+            <div style={{ textAlign: 'center', marginBottom: '30px', borderBottom: '2px solid #000', paddingBottom: '10px' }}>
+              <h1 style={{ fontSize: '28px', margin: '0 0 10px 0', color: '#000' }}>個人學經歷與自傳</h1>
+              <p style={{ fontSize: '14px', color: '#555', margin: 0 }}>更新日期：{new Date().toISOString().slice(0, 10)}</p>
+            </div>
+
+            <div style={{ marginBottom: '30px' }}>
+              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>基本資料</h2>
+              <ul style={{ paddingLeft: '20px', margin: 0, color: '#444', lineHeight: '1.8' }}>
+                 <li><strong>出生年月日：</strong> {basicInfo.birth ? basicInfo.birth.replace(/-/g, '/') : '未填寫'}</li>
+                 <li>
+                   <strong>學歷：</strong> 
+                   <div style={{ display: 'inline-block', verticalAlign: 'top' }}>
+                     {basicInfo.education ? basicInfo.education.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) : '未填寫'}
+                   </div>
+                 </li>
+                 <li>
+                   <strong>經歷：</strong> 
+                   <div style={{ display: 'inline-block', verticalAlign: 'top' }}>
+                     {basicInfo.experience ? basicInfo.experience.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) : '未填寫'}
+                   </div>
+                 </li>
+              </ul>
+            </div>
+
+            <div style={{ marginBottom: '30px' }}>
+              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>個人自傳</h2>
+              <p style={{ margin: '0', color: '#444', lineHeight: '1.8', textAlign: 'justify' }}>
+                您好，我具備紮實的行政歷練與優異的專案執行力。在過去的職涯中，我不僅穩健達成各項重要里程碑，更具備跨領域的思維（如數位轉型、系統開發），能靈活運用新工具解決實務痛點。此外，我擁有高度的自律性與長遠的規劃能力，能在高壓環境下保持高效產出。未來，我期許能持續發揮我的管理專長與創新思維，為團隊與組織帶來具體的貢獻。
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '30px' }}>
+              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>核心競爭力摘要</h2>
+              <ul style={{ paddingLeft: '20px', margin: 0 }}>
+                {mainQuests.filter(q => q.highlight).map(q => (
+                  <li key={`hl-${q.id}`} style={{ marginBottom: '8px', lineHeight: '1.5' }}>
+                    <strong>{q.highlight}：</strong>於「{q.title}」目標中展現。
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div style={{ marginBottom: '30px' }}>
+              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>重要經歷與里程碑</h2>
+              {mainQuests.length > 0 ? (
+                mainQuests.map(q => (
+                  <div key={`exp-${q.id}`} style={{ marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '5px' }}>
+                      <h3 style={{ fontSize: '16px', margin: 0, color: '#000' }}>{q.title}</h3>
+                      <span style={{ fontSize: '14px', color: '#666' }}>{q.date.replace(/-/g, '/')}</span>
+                    </div>
+                    <p style={{ margin: '5px 0 0 0', color: '#444', lineHeight: '1.6' }}>{q.description}</p>
+                  </div>
+                ))
+              ) : <p>無紀錄</p>}
+            </div>
+
+            <div style={{ marginBottom: '30px' }}>
+              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #d97706', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>榮譽與特殊獎勵</h2>
+              {hiddenQuests.length > 0 ? (
+                <ul style={{ paddingLeft: '20px', margin: 0 }}>
+                  {hiddenQuests.map(q => (
+                    <li key={`award-${q.id}`} style={{ marginBottom: '8px', lineHeight: '1.5', color: '#444' }}>
+                      <strong style={{ color: '#000' }}>{q.date.replace(/-/g, '/')} - {q.title}</strong>：{q.description} {q.highlight ? `(${q.highlight})` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p>無紀錄</p>}
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    // 啟動 React 應用程式
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
