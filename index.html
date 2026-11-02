@@ -3,38 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>人生英雄譚</title>
+  <title>人生英雄譚 - 跨裝置雲端同步版</title>
   
-  <!-- 引入 Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- 引入 Babel 以在瀏覽器中編譯 JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- 設定 React 與 Lucide 圖示的模組載入路徑 -->
+  <!-- 引入 React、Lucide 圖示與 Firebase 官方模組 -->
   <script type="importmap">
     {
       "imports": {
         "react": "https://esm.sh/react@18.2.0",
         "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0",
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"
       }
     }
   </script>
 </head>
 <body>
-  <!-- 應用程式的根節點 -->
   <div id="root"></div>
 
-  <!-- 主程式碼 -->
   <script type="text/babel" data-type="module">
-    import React, { useState, useEffect } from 'react';
+    import React, { useState, useEffect, useRef } from 'react';
     import { createRoot } from 'react-dom/client';
-    // 新增 Upload 圖示引入
-    import { Pencil, Trash2, Plus, Save, X, Target, Swords, Download, Clock, List, BookOpen, Award, FileText, Star, Sparkles, Upload } from 'lucide-react';
+    import { Pencil, Trash2, Plus, Save, X, Target, Swords, Download, Clock, List, BookOpen, Award, FileText, Star, Sparkles, Upload, Cloud, Settings, RefreshCw, CheckCircle2 } from 'lucide-react';
+    import { initializeApp, getApps, getApp } from 'firebase/app';
+    import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+
+    // ============================================================================
+    // ★【預留位置：預設 Firebase API Key 設定區】★
+    // 預先填入在這裡，任何新裝置、手機或無痕視窗打開網頁時，就會自動連線這組雲端資料庫！
+    // 若未來更換資料庫，可直接修改下方字串，或直接在網頁左側點擊「雲端設定」貼上新金鑰。
+    // ============================================================================
+    const DEFAULT_FIREBASE_CONFIG = {
+      apiKey: "AIzaSyC_41KNScIuQcHJjOzwjDo-gqG_laIjuJI",
+      authDomain: "resume-and-cv-888f6.firebaseapp.com",
+      projectId: "resume-and-cv-888f6",
+      storageBucket: "resume-and-cv-888f6.firebasestorage.app",
+      messagingSenderId: "174393391842",
+      appId: "1:174393391842:web:901b4dd9bc455aeebc3cbb",
+      measurementId: "G-GKE5WD2WL7",
+      collectionName: "mangaLife", // 雲端集合名稱
+      documentId: "myHeroData"     // 雲端存檔名稱 (不同裝置填一樣就會同步同一份資料)
+    };
 
     // ==========================================
-    // 預設資料
+    // 預設初始任務資料
     // ==========================================
     const defaultQuests = [
       { id: '1', type: 'main', status: 'completed', title: '第一話：考上普考', description: '展開公職生涯的起點。', date: '2020-10-31', highlight: '獲得穩定發展的基石' },
@@ -52,14 +67,10 @@
       const emblemId = Math.floor(type / 80) % 8;
 
       const palettes = [
-        ['#4ade80', '#166534', '#bbf7d0'], // 0: 草/風 (綠)
-        ['#f87171', '#7f1d1d', '#fecaca'], // 1: 火/力 (紅)
-        ['#60a5fa', '#1e3a8a', '#bfdbfe'], // 2: 水/冰 (藍)
-        ['#facc15', '#854d0e', '#fef08a'], // 3: 光/雷 (黃)
-        ['#c084fc', '#581c87', '#e9d5ff'], // 4: 暗/毒 (紫)
-        ['#fb923c', '#7c2d12', '#fed7aa'], // 5: 地/岩 (橘)
-        ['#2dd4bf', '#134e4a', '#ccfbf1'], // 6: 希卡科技 (青)
-        ['#94a3b8', '#334155', '#e2e8f0'], // 7: 鐵/無屬性 (銀)
+        ['#4ade80', '#166534', '#bbf7d0'], ['#f87171', '#7f1d1d', '#fecaca'], 
+        ['#60a5fa', '#1e3a8a', '#bfdbfe'], ['#facc15', '#854d0e', '#fef08a'], 
+        ['#c084fc', '#581c87', '#e9d5ff'], ['#fb923c', '#7c2d12', '#fed7aa'], 
+        ['#2dd4bf', '#134e4a', '#ccfbf1'], ['#94a3b8', '#334155', '#e2e8f0'], 
       ];
       const [main, stroke, highlight] = palettes[colorId];
 
@@ -128,9 +139,6 @@
       return emblemId * 80 + colorId * 10 + shapeId;
     };
 
-    // ==========================================
-    // Patapon 風格頭像組件
-    // ==========================================
     const PataponAvatar = () => (
       <svg viewBox="0 0 100 100" className="w-full h-full bg-[#E8DCC4]" xmlns="http://www.w3.org/2000/svg">
         <circle cx="50" cy="50" r="42" fill="#D5C5A3" />
@@ -152,10 +160,10 @@
     );
 
     // ==========================================
-    // 主應用程式 (移除 export default)
+    // 主應用程式
     // ==========================================
     function App() {
-      const [quests, setQuests] = useState([]);
+      const [quests, setQuests] = useState(defaultQuests);
       const [editingItem, setEditingItem] = useState(null);
       const [activeTab, setActiveTab] = useState('timeline');
       const [currentTime, setCurrentTime] = useState(new Date());
@@ -164,88 +172,164 @@
       const [isBasicInfoModalOpen, setIsBasicInfoModalOpen] = useState(false);
       const [expandedHiddenQuestId, setExpandedHiddenQuestId] = useState(null);
       const [isTreasureDexOpen, setIsTreasureDexOpen] = useState(false);
-
-      // ======== 新增：實體 JSON 存檔與讀檔功能 ========
-      const exportData = () => {
-        const dataToSave = { quests, basicInfo };
-        const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `人生英雄譚_存檔_${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      };
-
-      const triggerImport = () => {
-        document.getElementById('import-file').click();
-      };
-
-      const handleImportData = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          try {
-            const importedData = JSON.parse(event.target.result);
-            if (importedData.quests) {
-              setQuests(importedData.quests);
-              saveQuestsToLocal(importedData.quests);
-            }
-            if (importedData.basicInfo) {
-              setBasicInfo(importedData.basicInfo);
-              try { localStorage.setItem('mangaBasicInfoV9', JSON.stringify(importedData.basicInfo)); } catch (err) {}
-            }
-            alert('讀檔成功！歡迎回到英雄譚！✨');
-          } catch (err) {
-            alert('存檔格式錯誤或檔案損毀。(バシッ⚡)');
-          }
-          e.target.value = null; // 重置 input 以便下次可重複選擇同檔案
-        };
-        reader.readAsText(file);
-      };
-      // ====================================================
-
-      useEffect(() => {
-        // 在 Google 協作平台等沙盒環境中，localStorage 可能會有存取限制，加上 try-catch 防呆
+      
+      // 雲端同步與金鑰設定狀態
+      const [fbConfig, setFbConfig] = useState(() => {
         try {
-          const savedQuests = localStorage.getItem('mangaQuestsV9');
-          if (savedQuests) setQuests(JSON.parse(savedQuests));
-          else setQuests(defaultQuests);
+          const saved = localStorage.getItem('mangaFirebaseConfigV1');
+          if (saved) return { ...DEFAULT_FIREBASE_CONFIG, ...JSON.parse(saved) };
+        } catch (e) {}
+        return DEFAULT_FIREBASE_CONFIG;
+      });
+      const [tempFbConfig, setTempFbConfig] = useState(fbConfig);
+      const [rawConfigPaste, setRawConfigPaste] = useState('');
+      const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
+      const [syncStatus, setSyncStatus] = useState('連線中...');
+      const dbRef = useRef(null);
 
-          const savedBasicInfo = localStorage.getItem('mangaBasicInfoV9');
-          if (savedBasicInfo) {
-            const parsed = JSON.parse(savedBasicInfo);
-            setBasicInfo({
-              birth: parsed.birth || '1989-05-10',
-              education: parsed.education || '',
-              experience: parsed.experience || ''
-            });
-          }
-        } catch (e) {
-          console.warn("Storage access restricted.", e);
-          setQuests(defaultQuests);
-        }
+      // 履歷預覽與編輯狀態
+      const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+      const editablePreviewRef = useRef(null);
 
+      // 時間更新
+      useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
       }, []);
 
-      const saveQuestsToLocal = (data) => {
-        try {
-          localStorage.setItem('mangaQuestsV9', JSON.stringify(data));
-        } catch (e) {
-          console.warn("Failed to save to localStorage.", e);
+      // 動態初始化 Firebase 與監聽雲端資料
+      useEffect(() => {
+        if (!fbConfig.apiKey || !fbConfig.projectId) {
+          setSyncStatus('未設定金鑰 ⚙️');
+          return;
         }
-        setQuests(data);
+
+        let unsubscribe = null;
+        try {
+          setSyncStatus('連線中...');
+          // 使用專屬名稱初始化，允許動態切換不同專案設定
+          const appName = `mangaApp_${fbConfig.projectId}_${fbConfig.apiKey.slice(-4)}`;
+          const existingApps = getApps();
+          const currentApp = existingApps.find(a => a.name === appName) || initializeApp(fbConfig, appName);
+          const db = getFirestore(currentApp);
+          dbRef.current = db;
+
+          const colName = fbConfig.collectionName || "mangaLife";
+          const docName = fbConfig.documentId || "myHeroData";
+          const syncDocRef = doc(db, colName, docName);
+
+          unsubscribe = onSnapshot(syncDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              if (data.quests) setQuests(data.quests);
+              if (data.basicInfo) setBasicInfo(data.basicInfo);
+              setSyncStatus('已同步 ☁️');
+            } else {
+              // 若雲端尚無該文檔，將目前的預設資料寫入雲端初始化
+              setDoc(syncDocRef, { quests: defaultQuests, basicInfo: { birth: '1989-05-10', education: '', experience: '' } })
+                .then(() => setSyncStatus('已建立雲端檔 ☁️'))
+                .catch(() => setSyncStatus('權限不足 ⚠️'));
+            }
+          }, (error) => {
+            console.error("Firebase Sync Error:", error);
+            setSyncStatus('連線失敗 ⚠️');
+          });
+        } catch (err) {
+          console.error("Firebase Init Error:", err);
+          setSyncStatus('設定錯誤 ⚠️');
+        }
+
+        return () => {
+          if (unsubscribe) unsubscribe();
+        };
+      }, [fbConfig]);
+
+      // 寫入資料至 Firebase
+      const syncToFirebase = async (newQuests, newBasicInfo) => {
+        if (!dbRef.current) {
+          setSyncStatus('未連線 (僅本地)');
+          return;
+        }
+        setSyncStatus('同步中...');
+        try {
+          const colName = fbConfig.collectionName || "mangaLife";
+          const docName = fbConfig.documentId || "myHeroData";
+          const syncDocRef = doc(dbRef.current, colName, docName);
+          await setDoc(syncDocRef, { 
+            quests: newQuests, 
+            basicInfo: newBasicInfo,
+            updatedAt: new Date().toISOString()
+          });
+          setSyncStatus('已同步 ☁️');
+        } catch (e) {
+          console.error(e);
+          setSyncStatus('同步失敗 ⚠️');
+          alert('雲端寫入失敗！請確認：1. 金鑰是否正確 2. Firestore Rules 是否已設為 allow read, write: if true;');
+        }
+      };
+
+      // 手動從雲端強制讀取最新資料
+      const manualFetchFromCloud = async () => {
+        if (!dbRef.current) return alert('尚未連線至 Firebase！');
+        setSyncStatus('讀取中...');
+        try {
+          const colName = fbConfig.collectionName || "mangaLife";
+          const docName = fbConfig.documentId || "myHeroData";
+          const snap = await getDoc(doc(dbRef.current, colName, docName));
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data.quests) setQuests(data.quests);
+            if (data.basicInfo) setBasicInfo(data.basicInfo);
+            setSyncStatus('已同步 ☁️');
+            alert('已成功從雲端載入最新資料！✨');
+          } else {
+            alert('雲端目前沒有這個存檔 ID 的資料。');
+          }
+        } catch (e) {
+          setSyncStatus('讀取失敗 ⚠️');
+          alert('讀取失敗：' + e.message);
+        }
+      };
+
+      // 智慧解析整段 Firebase Config 程式碼
+      const handleSmartParseConfig = (text) => {
+        setRawConfigPaste(text);
+        if (!text.trim()) return;
+        const extract = (key) => {
+          const match = text.match(new RegExp(`${key}\\s*:\\s*["']([^"']+)["']`));
+          return match ? match[1] : null;
+        };
+        const parsed = { ...tempFbConfig };
+        ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId', 'measurementId'].forEach(k => {
+          const val = extract(k);
+          if (val) parsed[k] = val;
+        });
+        setTempFbConfig(parsed);
+      };
+
+      // 儲存 Firebase 金鑰設定
+      const handleSaveFirebaseConfig = () => {
+        if (!tempFbConfig.apiKey.trim() || !tempFbConfig.projectId.trim()) {
+          alert('apiKey 與 projectId 為必填項目！');
+          return;
+        }
+        setFbConfig(tempFbConfig);
+        try {
+          localStorage.setItem('mangaFirebaseConfigV1', JSON.stringify(tempFbConfig));
+        } catch (e) {}
+        setIsFirebaseModalOpen(false);
+        setRawConfigPaste('');
+      };
+
+      const handleResetFirebaseConfig = () => {
+        setTempFbConfig(DEFAULT_FIREBASE_CONFIG);
+        setFbConfig(DEFAULT_FIREBASE_CONFIG);
+        try { localStorage.removeItem('mangaFirebaseConfigV1'); } catch (e) {}
       };
 
       const handleBasicInfoSave = () => {
-        try {
-          localStorage.setItem('mangaBasicInfoV9', JSON.stringify(basicInfo));
-        } catch (e) {}
+        setBasicInfo(basicInfo);
+        syncToFirebase(quests, basicInfo);
         setIsBasicInfoModalOpen(false);
       };
 
@@ -264,19 +348,34 @@
         if (!editingItem.title.trim()) { alert('標題不能為空！(バシッ⚡)'); return; }
         const isNew = !quests.find(q => q.id === editingItem.id);
         const newData = isNew ? [...quests, editingItem] : quests.map(q => q.id === editingItem.id ? editingItem : q);
-        saveQuestsToLocal(newData);
+        setQuests(newData);
+        syncToFirebase(newData, basicInfo);
         setEditingItem(null);
       };
 
       const handleQuestDelete = (id) => {
         if (window.confirm('確定要捨棄這個分鏡嗎？(ドーン💥)')) {
-          saveQuestsToLocal(quests.filter(q => q.id !== id));
+          const newData = quests.filter(q => q.id !== id);
+          setQuests(newData);
+          syncToFirebase(newData, basicInfo);
           setEditingItem(null);
         }
       };
       
-      const exportWord = () => {
-        const content = document.getElementById('export-template').innerHTML;
+      // 開啟履歷預覽模式
+      const openPreviewModal = () => {
+        setIsPreviewModalOpen(true);
+        setTimeout(() => {
+          if (editablePreviewRef.current) {
+            editablePreviewRef.current.innerHTML = document.getElementById('export-template').innerHTML;
+          }
+        }, 100);
+      };
+
+      // 確認匯出 Word
+      const confirmExportWord = () => {
+        if (!editablePreviewRef.current) return;
+        const content = editablePreviewRef.current.innerHTML;
         const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>履歷匯出</title><style>body { font-family: "Microsoft JhengHei", sans-serif; line-height: 1.6; } h1, h2, h3 { color: #333; } .date { color: #666; font-size: 0.9em; }</style></head><body>${content}</body></html>`;
         const url = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(html);
         const link = document.createElement('a');
@@ -285,6 +384,42 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setIsPreviewModalOpen(false);
+      };
+
+      // 實體 JSON 備份與還原
+      const exportData = () => {
+        const dataToSave = { quests, basicInfo };
+        const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `人生英雄譚_存檔_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      };
+      const triggerImport = () => document.getElementById('import-file').click();
+      const handleImportData = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const importedData = JSON.parse(event.target.result);
+            if (importedData.quests || importedData.basicInfo) {
+               const nextQuests = importedData.quests || quests;
+               const nextBasic = importedData.basicInfo || basicInfo;
+               setQuests(nextQuests);
+               setBasicInfo(nextBasic);
+               syncToFirebase(nextQuests, nextBasic);
+               alert('讀檔成功！已同步更新至雲端。✨');
+            }
+          } catch (err) { alert('存檔格式錯誤或檔案損毀。'); }
+          e.target.value = null; 
+        };
+        reader.readAsText(file);
       };
 
       const sortedQuests = [...quests].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -303,6 +438,7 @@
             ::-webkit-scrollbar-track { background: #f3f4f6; border-left: 2px solid #000; }
             ::-webkit-scrollbar-thumb { background: #000; border: 2px solid #f3f4f6; }
             ::-webkit-scrollbar-thumb:hover { background: #333; }
+            [contenteditable="true"]:focus { outline: 2px dashed #3b82f6; outline-offset: 4px; }
           `}</style>
 
           <div className="min-h-screen font-serif text-black print:hidden flex overflow-hidden relative selection:bg-gray-300"
@@ -310,8 +446,18 @@
             
             {/* --- 左側系統導航列 --- */}
             <div className="w-64 bg-white border-r-[6px] border-black flex flex-col z-20 shadow-[8px_0_0_0_rgba(0,0,0,1)] relative font-sans shrink-0">
-              <div className="p-6 pb-8 border-b-[4px] border-black flex flex-col items-center bg-gray-100">
-                <div className="w-28 h-28 bg-slate-900 border-[4px] border-black mb-4 flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transform -rotate-2 overflow-hidden relative">
+              <div className="p-6 pb-8 border-b-[4px] border-black flex flex-col items-center bg-gray-100 relative">
+                {/* 雲端狀態指示器 (點擊可直接開啟設定) */}
+                <button 
+                  onClick={() => { setTempFbConfig(fbConfig); setIsFirebaseModalOpen(true); }}
+                  className="absolute top-2 left-2 text-xs font-black bg-white border-2 border-black px-2 py-0.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-yellow-100 flex items-center gap-1 transition-all"
+                  title="點擊設定 Firebase 雲端金鑰"
+                >
+                   <Cloud size={13} className={syncStatus.includes('同步中') || syncStatus.includes('連線中') ? 'animate-pulse text-blue-600' : syncStatus.includes('已同步') ? 'text-green-600' : 'text-red-500'} /> 
+                   <span>{syncStatus}</span>
+                </button>
+                
+                <div className="w-28 h-28 bg-slate-900 border-[4px] border-black mb-4 mt-5 flex items-center justify-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transform -rotate-2 overflow-hidden relative">
                      <div className="w-full h-full transition-all duration-300 bg-white flex items-center justify-center">
                        <PataponAvatar />
                      </div>
@@ -324,12 +470,9 @@
                 >
                   主角 <Pencil size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                 </h2>
-                <div className="flex items-center gap-1 text-xs font-bold mt-3 bg-black text-white px-2 py-0.5 relative z-10">
-                  <BookOpen size={12} /> 連載中
-                </div>
               </div>
 
-              <div className="flex-1 py-6 px-4 space-y-3 bg-white">
+              <div className="flex-1 py-6 px-4 space-y-3 bg-white overflow-y-auto">
                 <div className="text-sm font-black uppercase tracking-widest border-l-4 border-black pl-2 mb-2">目錄</div>
                 <button onClick={() => setActiveTab('timeline')} className={`w-full flex items-center gap-3 px-4 py-3 font-black transition-all duration-300 border-[3px] border-black ${activeTab === 'timeline' ? 'bg-black text-white shadow-[4px_4px_0px_0px_rgba(100,100,100,1)] transform -translate-y-1' : 'bg-white text-black hover:bg-gray-100 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'}`}>
                   <Clock size={20} strokeWidth={2.5} /> <span className="tracking-widest">時間軸</span>
@@ -341,29 +484,29 @@
                   <Sparkles size={20} strokeWidth={2.5} /> <span className="tracking-widest">稱號</span>
                 </button>
 
-                <div className="text-sm font-black uppercase tracking-widest border-l-4 border-black pl-2 mt-10 mb-2">系統</div>
-            <button onClick={() => openEdit(null)} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-dashed border-black font-bold hover:bg-gray-100 transition-all">
-              <Plus size={18} strokeWidth={3} /> <span className="tracking-widest">新增劇情</span>
-            </button>
-            <button onClick={exportWord} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-black text-white hover:bg-gray-800 transition-all shadow-[2px_2px_0px_0px_rgba(100,100,100,1)]">
-              <FileText size={18} strokeWidth={2.5} /> <span className="tracking-widest">輸出履歷</span>
-            </button>
+                <div className="text-sm font-black uppercase tracking-widest border-l-4 border-black pl-2 mt-8 mb-2">系統</div>
+                <button onClick={() => openEdit(null)} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-dashed border-black font-bold hover:bg-gray-100 transition-all">
+                  <Plus size={18} strokeWidth={3} /> <span className="tracking-widest">新增劇情</span>
+                </button>
+                <button onClick={openPreviewModal} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-black text-white hover:bg-gray-800 transition-all shadow-[2px_2px_0px_0px_rgba(100,100,100,1)]">
+                  <FileText size={18} strokeWidth={2.5} /> <span className="tracking-widest">輸出履歷</span>
+                </button>
+                <button onClick={() => { setTempFbConfig(fbConfig); setIsFirebaseModalOpen(true); }} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-yellow-300 hover:bg-yellow-400 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                  <Settings size={18} strokeWidth={2.5} /> <span className="tracking-widest">雲端設定 (API)</span>
+                </button>
 
-            {/* 新增備份管理區塊 */}
-            <div className="text-sm font-black uppercase tracking-widest border-l-4 border-black pl-2 mt-8 mb-2">備份管理</div>
-            <button onClick={exportData} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-blue-100 hover:bg-blue-200 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-              <Download size={18} strokeWidth={2.5} /> <span className="tracking-widest">下載存檔 (備份)</span>
-            </button>
-            <button onClick={triggerImport} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-green-100 hover:bg-green-200 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] mt-2">
-              <Upload size={18} strokeWidth={2.5} /> <span className="tracking-widest">讀取存檔 (還原)</span>
-            </button>
-            
-            {/* 隱藏的檔案上傳元素 */}
-            <input type="file" id="import-file" accept=".json" style={{ display: 'none' }} onChange={handleImportData} />
-          </div>
-        </div>
+                <div className="text-sm font-black uppercase tracking-widest border-l-4 border-black pl-2 mt-8 mb-2">離線備份</div>
+                <button onClick={exportData} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-blue-100 hover:bg-blue-200 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                  <Download size={18} strokeWidth={2.5} /> <span className="tracking-widest">下載存檔</span>
+                </button>
+                <button onClick={triggerImport} className="w-full flex items-center gap-3 px-4 py-2 border-2 border-black font-bold bg-green-100 hover:bg-green-200 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] mt-2">
+                  <Upload size={18} strokeWidth={2.5} /> <span className="tracking-widest">還原進度</span>
+                </button>
+                <input type="file" id="import-file" accept=".json" style={{ display: 'none' }} onChange={handleImportData} />
+              </div>
+            </div>
 
-        {/* --- 右側內容顯示區 --- */}
+            {/* --- 右側內容顯示區 --- */}
             <div className="flex-1 flex flex-col h-screen overflow-hidden relative z-10">
               <div className="h-16 w-full flex items-center justify-end px-8 pt-4 shrink-0">
                 <div className="flex items-center gap-3 text-black font-black text-sm bg-white border-4 border-black px-4 py-1.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transform rotate-1 tracking-widest">
@@ -392,7 +535,7 @@
                         
                         {sortedQuests.length === 0 && <p className="text-center font-black bg-white border-4 border-black inline-block px-6 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative z-10 self-center mb-12">尚未開始連載</p>}
                         
-                        {sortedQuests.map((q, idx) => {
+                        {sortedQuests.map((q) => {
                           const isMain = q.type === 'main';
                           const isHidden = q.type === 'hidden';
                           
@@ -589,6 +732,88 @@
               </div>
             </div>
 
+            {/* ================= 雲端設定 (Firebase API Key) 彈窗 ================= */}
+            {isFirebaseModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsFirebaseModalOpen(false)}></div>
+                <div className="relative bg-white border-[6px] border-black w-full max-w-2xl flex flex-col shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-black animate-[scaleIn_0.2s_ease-out] font-sans max-h-[90vh]">
+                  <div className="p-5 border-b-4 border-black flex justify-between items-center bg-yellow-300">
+                    <h2 className="text-2xl font-black flex items-center gap-2"><Cloud size={28}/> 跨裝置雲端同步設定 (Firebase)</h2>
+                    <button onClick={() => setIsFirebaseModalOpen(false)}><X size={24} strokeWidth={3}/></button>
+                  </div>
+                  
+                  <div className="p-6 space-y-5 overflow-y-auto">
+                    {/* 手動同步控制列 */}
+                    <div className="bg-gray-100 border-2 border-black p-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-black">目前連線狀態：<span className="text-blue-600">{syncStatus}</span></div>
+                        <div className="text-xs font-bold text-gray-600 mt-0.5">只要不同裝置填入相同的 Project ID 與存檔名稱，開啟網頁就會自動同步。</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={manualFetchFromCloud} className="px-3 py-1.5 bg-white border-2 border-black font-black text-xs hover:bg-blue-100 flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                          <RefreshCw size={14}/> 立即從雲端讀取
+                        </button>
+                        <button onClick={() => syncToFirebase(quests, basicInfo)} className="px-3 py-1.5 bg-black text-white border-2 border-black font-black text-xs hover:bg-gray-800 flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(100,100,100,1)]">
+                          <CheckCircle2 size={14}/> 強制寫入雲端
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 智慧貼上解析區 */}
+                    <div className="bg-blue-50 border-2 border-dashed border-blue-600 p-4">
+                      <label className="block font-black text-sm text-blue-900 mb-1">⚡ 快速貼上區（選填：直接貼上整段 firebaseConfig 程式碼自動填入）</label>
+                      <textarea 
+                        className="w-full h-20 bg-white border-2 border-black p-2 text-xs font-mono"
+                        placeholder={'貼上例如：apiKey: "AIza...", authDomain: "...", projectId: "..." 系統會自動幫您拆解填入下方欄位！'}
+                        value={rawConfigPaste}
+                        onChange={(e) => handleSmartParseConfig(e.target.value)}
+                      />
+                    </div>
+
+                    {/* 各別欄位設定 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <label className="block font-black text-sm mb-1">API Key <span className="text-red-500">*</span></label>
+                        <input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-mono text-sm" value={tempFbConfig.apiKey || ''} onChange={e => setTempFbConfig({...tempFbConfig, apiKey: e.target.value})} placeholder="AIzaSy..." />
+                      </div>
+                      <div>
+                        <label className="block font-black text-sm mb-1">Project ID <span className="text-red-500">*</span></label>
+                        <input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-mono text-sm" value={tempFbConfig.projectId || ''} onChange={e => setTempFbConfig({...tempFbConfig, projectId: e.target.value})} placeholder="resume-and-cv-..." />
+                      </div>
+                      <div>
+                        <label className="block font-black text-sm mb-1">Auth Domain</label>
+                        <input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-mono text-sm" value={tempFbConfig.authDomain || ''} onChange={e => setTempFbConfig({...tempFbConfig, authDomain: e.target.value})} placeholder="xxx.firebaseapp.com" />
+                      </div>
+                      <div>
+                        <label className="block font-black text-sm mb-1">Storage Bucket</label>
+                        <input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-mono text-sm" value={tempFbConfig.storageBucket || ''} onChange={e => setTempFbConfig({...tempFbConfig, storageBucket: e.target.value})} placeholder="xxx.firebasestorage.app" />
+                      </div>
+                      <div>
+                        <label className="block font-black text-sm mb-1">App ID</label>
+                        <input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-mono text-sm" value={tempFbConfig.appId || ''} onChange={e => setTempFbConfig({...tempFbConfig, appId: e.target.value})} placeholder="1:1743...:web:..." />
+                      </div>
+                      <div>
+                        <label className="block font-black text-sm mb-1">雲端集合名稱 (Collection)</label>
+                        <input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-mono text-sm" value={tempFbConfig.collectionName || 'mangaLife'} onChange={e => setTempFbConfig({...tempFbConfig, collectionName: e.target.value})} />
+                      </div>
+                      <div>
+                        <label className="block font-black text-sm mb-1">雲端存檔名稱 (Document ID)</label>
+                        <input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-mono text-sm" value={tempFbConfig.documentId || 'myHeroData'} onChange={e => setTempFbConfig({...tempFbConfig, documentId: e.target.value})} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 border-t-4 border-black bg-gray-100 flex justify-between items-center">
+                    <button onClick={handleResetFirebaseConfig} className="text-xs font-black text-gray-600 hover:text-black underline">還原為程式碼內建預設金鑰</button>
+                    <div className="flex gap-3">
+                      <button onClick={() => setIsFirebaseModalOpen(false)} className="font-black px-5 py-2 border-4 border-black bg-white hover:bg-gray-200">取消</button>
+                      <button onClick={handleSaveFirebaseConfig} className="font-black px-6 py-2 bg-black text-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(100,100,100,1)]">儲存並連線 !</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ================= 任務編輯彈窗 ================= */}
             {editingItem && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden">
@@ -638,10 +863,41 @@
               </div>
             )}
 
+            {/* ================= 履歷預覽與編輯彈窗 (所見即所得) ================= */}
+            {isPreviewModalOpen && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm print:hidden">
+                <div className="relative bg-white border-[6px] border-black w-full max-w-4xl flex flex-col shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-black h-[90vh] animate-[scaleIn_0.2s_ease-out]">
+                  <div className="p-4 border-b-4 border-black flex justify-between items-center bg-gray-100 shrink-0">
+                    <h2 className="text-xl font-black flex items-center gap-2">
+                      <FileText size={24} /> 履歷預覽與編輯 <span className="text-sm font-bold text-gray-500 bg-gray-200 px-2 py-1 rounded ml-2">※ 可直接點擊下方紙張修改文字</span>
+                    </h2>
+                    <button onClick={() => setIsPreviewModalOpen(false)} className="hover:text-gray-500"><X size={24} strokeWidth={3} /></button>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-300">
+                    <div 
+                      ref={editablePreviewRef}
+                      contentEditable={true} 
+                      suppressContentEditableWarning={true}
+                      className="bg-white mx-auto p-10 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)] min-h-[1056px] max-w-[800px] outline-none"
+                      style={{ fontFamily: '"Microsoft JhengHei", sans-serif', lineHeight: '1.6', cursor: 'text' }}
+                    ></div>
+                  </div>
+                  
+                  <div className="p-4 border-t-4 border-black bg-gray-100 flex justify-end gap-4 shrink-0">
+                    <button onClick={() => setIsPreviewModalOpen(false)} className="font-black px-6 py-2 border-4 border-black hover:bg-gray-200 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">取消</button>
+                    <button onClick={confirmExportWord} className="font-black px-8 py-2 bg-blue-600 text-white border-4 border-black hover:bg-blue-700 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2">
+                      <Download size={20} strokeWidth={3} /> 確認匯出 Word
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
 
-          {/* ======== 【列印用：傳統白底黑字履歷模板】 ======== */}
-          <div id="export-template" className="hidden print:block font-sans max-w-[800px] mx-auto p-8 text-black bg-white">
+          {/* ======== 【隱藏渲染區：用於產生履歷初始 HTML】 ======== */}
+          <div id="export-template" className="hidden">
             <div style={{ textAlign: 'center', marginBottom: '30px', borderBottom: '2px solid #000', paddingBottom: '10px' }}>
               <h1 style={{ fontSize: '28px', margin: '0 0 10px 0', color: '#000' }}>個人學經歷與自傳</h1>
               <p style={{ fontSize: '14px', color: '#555', margin: 0 }}>更新日期：{new Date().toISOString().slice(0, 10)}</p>
@@ -716,7 +972,6 @@
       );
     }
 
-    // 啟動 React 應用程式
     const root = createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
