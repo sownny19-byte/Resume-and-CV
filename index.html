@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>人生英雄譚 - 跨裝置雲端同步版</title>
+  <title>人生英雄譚</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -28,7 +28,7 @@
     import React, { useState, useEffect, useRef } from 'react';
     import { createRoot } from 'react-dom/client';
     import { Pencil, Trash2, Plus, Save, X, Target, Swords, Download, Clock, List, BookOpen, Award, FileText, Star, Sparkles, Upload, Cloud, Settings, RefreshCw, CheckCircle2 } from 'lucide-react';
-    import { initializeApp, getApps, getApp } from 'firebase/app';
+    import { initializeApp, getApps } from 'firebase/app';
     import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 
     // ============================================================================
@@ -59,7 +59,7 @@
     ];
 
     // ==========================================
-    // 程序化寶物生成器 (薩爾達傳說風格)
+    // 程序化寶物生成器 (薩爾達傳說風格，640種組合)
     // ==========================================
     const TreasureIcon = ({ type, className = "w-12 h-12" }) => {
       const shapeId = type % 10;
@@ -139,6 +139,106 @@
       return emblemId * 80 + colorId * 10 + shapeId;
     };
 
+    // ============================================================================
+    // ★【智慧自傳動態生成引擎】★
+    // 依據主角的「基本學經歷」與「主線、隱藏、副本任務」，每次增刪時自動重新編寫成流暢的正式自傳
+    // ============================================================================
+    const cleanMangaPrefix = (str = '') => {
+      return str
+        .replace(/^(第[一二三四五六七八九十百千萬0-9]+話|最終話|特別篇|番外篇|休刊小憩|序章|終章)[：:：\s-]*/g, '')
+        .replace(/^(獲得寶具|獲得狀態|獲得稱號|獲得技能|達成成就|解鎖成就)[：:：\s-]*/g, '')
+        .trim();
+    };
+
+    const generateDynamicAutobiography = (basicInfo, mainQuests, hiddenQuests, sideQuests) => {
+      const paragraphs = [];
+
+      // 1. 第一段：學經歷背景與職涯定位
+      const eduLines = basicInfo.education ? basicInfo.education.split('\n').map(s => s.trim()).filter(Boolean) : [];
+      const expLines = basicInfo.experience ? basicInfo.experience.split('\n').map(s => s.trim()).filter(Boolean) : [];
+
+      let p1 = '您好，';
+      if (eduLines.length > 0 && expLines.length > 0) {
+        p1 += `我畢業於${eduLines[0]}${eduLines.length > 1 ? `（並具備${eduLines.slice(1).join('、')}等學術背景）` : ''}。在職涯發展上，曾歷練${expLines.join('、')}等職務。`;
+      } else if (eduLines.length > 0) {
+        p1 += `我畢業於${eduLines.join('、')}，具備紮實的專業學識基礎與邏輯分析能力。`;
+      } else if (expLines.length > 0) {
+        p1 += `在過去的職涯歷練中，我曾任職於${expLines.join('、')}，累積了深厚的實務運作與專案管理經驗。`;
+      } else {
+        p1 += `我具備紮實的實務歷練與優異的專案執行力，行事穩健且富責任感。`;
+      }
+      p1 += '在過往的工作與學習歷程中，我始終保持積極進取的態度，致力於將專業知識轉化為具體的實務成果，並在面對挑戰時尋求創新與突破。';
+      paragraphs.push(p1);
+
+      // 2. 第二段：主線任務串聯（核心職涯演進故事，取代流水帳）
+      if (mainQuests.length > 0) {
+        const narratives = mainQuests.map((q, idx) => {
+          const year = q.date ? q.date.slice(0, 4) : '';
+          const title = cleanMangaPrefix(q.title);
+          const desc = (q.description || '').replace(/[。！!？?]+$/, '');
+          const hl = cleanMangaPrefix(q.highlight);
+
+          let sentence = '';
+          if (idx === 0) {
+            sentence += `回顧職涯的重要起點，我於 ${year} 年達成「${title}」`;
+          } else if (idx === mainQuests.length - 1 && mainQuests.length > 1) {
+            sentence += `近期則於 ${year} 年進一步完成「${title}」`;
+          } else {
+            sentence += `隨後在 ${year} 年期間，我順利推進「${title}」`;
+          }
+
+          if (desc) sentence += `，期間${desc}`;
+          if (hl) sentence += `，不僅為個人職涯奠定「${hl}」的關鍵優勢，也強化了實務應變與決策能力`;
+          return sentence;
+        });
+
+        paragraphs.push(
+          `在職涯關鍵里程碑的推進上，我採取穩紮穩打且具前瞻性的策略。${narratives.join('；')}。每一個階段的歷練，皆讓我對組織運作與專案控管有更深一層的體悟。`
+        );
+      }
+
+      // 3. 第三段：隱藏成就（特殊榮譽）與副本任務（跨域視野與抗壓性）
+      if (hiddenQuests.length > 0 || sideQuests.length > 0) {
+        let p3 = '';
+        if (hiddenQuests.length > 0) {
+          const honors = hiddenQuests.map(q => {
+            const title = cleanMangaPrefix(q.title);
+            const desc = (q.description || '').replace(/[。！!？?]+$/, '');
+            const hl = cleanMangaPrefix(q.highlight);
+            return `透過「${title}」（${desc}${hl ? `，展現出${hl}` : ''}）`;
+          });
+          p3 += `除了核心業務的推進，我亦積極追求卓越表現。在實務績效上，曾${honors.join('、')}，相關成果皆獲得長官與團隊的高度肯定。`;
+        }
+
+        if (sideQuests.length > 0) {
+          const sideTitles = sideQuests.map(q => `「${cleanMangaPrefix(q.title)}」`).join('、');
+          const sideHighlights = sideQuests.map(q => cleanMangaPrefix(q.highlight)).filter(Boolean);
+          p3 += `${hiddenQuests.length > 0 ? '此外，' : '在專業領域之外，'}我也非常重視跨域思維的培養與身心狀態的平衡。透過投入${sideTitles}等多元經歷，讓我${sideHighlights.length > 0 ? `收穫了「${sideHighlights.join('」、「')}」等正向能量，` : ''}得以在高壓與高強度的工作環境下，依然保持充沛的創造力、抗壓性與高效的執行力。`;
+        }
+        paragraphs.push(p3);
+      }
+
+      // 4. 第四段：核心競爭力總結與未來展望
+      const allHighlights = [...mainQuests, ...hiddenQuests]
+        .map(q => cleanMangaPrefix(q.highlight))
+        .filter(Boolean);
+      const uniqueHighlights = Array.from(new Set(allHighlights));
+
+      let p4 = '綜觀過去的學經歷與實務成果，';
+      if (uniqueHighlights.length > 0) {
+        p4 += `我已逐步構築起包含「${uniqueHighlights.join('」、「')}」在內的核心競爭力。`;
+      } else {
+        p4 += `我已培養出獨立思考、跨部門溝通協調與解決複雜問題的綜合能力。`;
+      }
+      p4 += '展望未來，我期許自己能持續深化專業廣度與管理思維，將過往累積的實戰經驗化為團隊前進的助力，在新的舞台上創造更具影響力的價值與具體貢獻。';
+      paragraphs.push(p4);
+
+      return paragraphs;
+    };
+
+    // ==========================================
+    // Patapon 風格頭像組件 (全圓眼、純黑眼球)
+    // ==========================================
     const PataponAvatar = () => (
       <svg viewBox="0 0 100 100" className="w-full h-full bg-[#E8DCC4]" xmlns="http://www.w3.org/2000/svg">
         <circle cx="50" cy="50" r="42" fill="#D5C5A3" />
@@ -185,11 +285,17 @@
       const [rawConfigPaste, setRawConfigPaste] = useState('');
       const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
       const [syncStatus, setSyncStatus] = useState('連線中...');
+      const [toastMsg, setToastMsg] = useState(null);
       const dbRef = useRef(null);
 
       // 履歷預覽與編輯狀態
       const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
       const editablePreviewRef = useRef(null);
+
+      const showToast = (msg) => {
+        setToastMsg(msg);
+        setTimeout(() => setToastMsg(null), 3000);
+      };
 
       // 時間更新
       useEffect(() => {
@@ -207,7 +313,6 @@
         let unsubscribe = null;
         try {
           setSyncStatus('連線中...');
-          // 使用專屬名稱初始化，允許動態切換不同專案設定
           const appName = `mangaApp_${fbConfig.projectId}_${fbConfig.apiKey.slice(-4)}`;
           const existingApps = getApps();
           const currentApp = existingApps.find(a => a.name === appName) || initializeApp(fbConfig, appName);
@@ -225,7 +330,6 @@
               if (data.basicInfo) setBasicInfo(data.basicInfo);
               setSyncStatus('已同步 ☁️');
             } else {
-              // 若雲端尚無該文檔，將目前的預設資料寫入雲端初始化
               setDoc(syncDocRef, { quests: defaultQuests, basicInfo: { birth: '1989-05-10', education: '', experience: '' } })
                 .then(() => setSyncStatus('已建立雲端檔 ☁️'))
                 .catch(() => setSyncStatus('權限不足 ⚠️'));
@@ -261,16 +365,17 @@
             updatedAt: new Date().toISOString()
           });
           setSyncStatus('已同步 ☁️');
+          showToast('已同步至雲端 ☁️');
         } catch (e) {
           console.error(e);
           setSyncStatus('同步失敗 ⚠️');
-          alert('雲端寫入失敗！請確認：1. 金鑰是否正確 2. Firestore Rules 是否已設為 allow read, write: if true;');
+          showToast('雲端寫入失敗，請檢查金鑰與 Firestore Rules 權限');
         }
       };
 
       // 手動從雲端強制讀取最新資料
       const manualFetchFromCloud = async () => {
-        if (!dbRef.current) return alert('尚未連線至 Firebase！');
+        if (!dbRef.current) return showToast('尚未連線至 Firebase！');
         setSyncStatus('讀取中...');
         try {
           const colName = fbConfig.collectionName || "mangaLife";
@@ -281,13 +386,13 @@
             if (data.quests) setQuests(data.quests);
             if (data.basicInfo) setBasicInfo(data.basicInfo);
             setSyncStatus('已同步 ☁️');
-            alert('已成功從雲端載入最新資料！✨');
+            showToast('已成功從雲端載入最新資料！✨');
           } else {
-            alert('雲端目前沒有這個存檔 ID 的資料。');
+            showToast('雲端目前沒有這個存檔 ID 的資料。');
           }
         } catch (e) {
           setSyncStatus('讀取失敗 ⚠️');
-          alert('讀取失敗：' + e.message);
+          showToast('讀取失敗：' + e.message);
         }
       };
 
@@ -310,7 +415,7 @@
       // 儲存 Firebase 金鑰設定
       const handleSaveFirebaseConfig = () => {
         if (!tempFbConfig.apiKey.trim() || !tempFbConfig.projectId.trim()) {
-          alert('apiKey 與 projectId 為必填項目！');
+          showToast('apiKey 與 projectId 為必填項目！');
           return;
         }
         setFbConfig(tempFbConfig);
@@ -319,12 +424,14 @@
         } catch (e) {}
         setIsFirebaseModalOpen(false);
         setRawConfigPaste('');
+        showToast('雲端設定已更新並重新連線！');
       };
 
       const handleResetFirebaseConfig = () => {
         setTempFbConfig(DEFAULT_FIREBASE_CONFIG);
         setFbConfig(DEFAULT_FIREBASE_CONFIG);
         try { localStorage.removeItem('mangaFirebaseConfigV1'); } catch (e) {}
+        showToast('已還原為預設雲端金鑰！');
       };
 
       const handleBasicInfoSave = () => {
@@ -345,7 +452,7 @@
       };
 
       const handleQuestSave = () => {
-        if (!editingItem.title.trim()) { alert('標題不能為空！(バシッ⚡)'); return; }
+        if (!editingItem.title.trim()) { showToast('標題不能為空！(バシッ⚡)'); return; }
         const isNew = !quests.find(q => q.id === editingItem.id);
         const newData = isNew ? [...quests, editingItem] : quests.map(q => q.id === editingItem.id ? editingItem : q);
         setQuests(newData);
@@ -354,21 +461,24 @@
       };
 
       const handleQuestDelete = (id) => {
-        if (window.confirm('確定要捨棄這個分鏡嗎？(ドーン💥)')) {
-          const newData = quests.filter(q => q.id !== id);
-          setQuests(newData);
-          syncToFirebase(newData, basicInfo);
-          setEditingItem(null);
-        }
+        const newData = quests.filter(q => q.id !== id);
+        setQuests(newData);
+        syncToFirebase(newData, basicInfo);
+        setEditingItem(null);
+        showToast('已刪除該筆分鏡紀錄 💥');
       };
       
-      // 開啟履歷預覽模式
+      // 開啟履歷預覽模式（每次開啟或點擊重整時，依據最新學經歷重新編寫自傳）
+      const refreshEditableResume = () => {
+        if (editablePreviewRef.current && document.getElementById('export-template')) {
+          editablePreviewRef.current.innerHTML = document.getElementById('export-template').innerHTML;
+        }
+      };
+
       const openPreviewModal = () => {
         setIsPreviewModalOpen(true);
         setTimeout(() => {
-          if (editablePreviewRef.current) {
-            editablePreviewRef.current.innerHTML = document.getElementById('export-template').innerHTML;
-          }
+          refreshEditableResume();
         }, 100);
       };
 
@@ -385,6 +495,7 @@
         link.click();
         document.body.removeChild(link);
         setIsPreviewModalOpen(false);
+        showToast('履歷已匯出下載！📄');
       };
 
       // 實體 JSON 備份與還原
@@ -414,9 +525,9 @@
                setQuests(nextQuests);
                setBasicInfo(nextBasic);
                syncToFirebase(nextQuests, nextBasic);
-               alert('讀檔成功！已同步更新至雲端。✨');
+               showToast('讀檔成功！已同步更新至雲端。✨');
             }
-          } catch (err) { alert('存檔格式錯誤或檔案損毀。'); }
+          } catch (err) { showToast('存檔格式錯誤或檔案損毀。'); }
           e.target.value = null; 
         };
         reader.readAsText(file);
@@ -430,6 +541,9 @@
       const highlightedQuests = sortedQuests.filter(q => q.highlight && q.highlight.trim() !== '');
       const collectedTreasureTypes = Array.from(new Set(highlightedQuests.map(q => getTreasureType(q.highlight))));
 
+      // 每次增刪任務或修改基本資料時，即時動態重新編寫個人自傳段落
+      const autoBioParagraphs = generateDynamicAutobiography(basicInfo, mainQuests, hiddenQuests, sideQuests);
+
       return (
         <>
           <style>{`
@@ -440,6 +554,13 @@
             ::-webkit-scrollbar-thumb:hover { background: #333; }
             [contenteditable="true"]:focus { outline: 2px dashed #3b82f6; outline-offset: 4px; }
           `}</style>
+
+          {/* 頂部系統訊息提示框 */}
+          {toastMsg && (
+            <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-[200] bg-yellow-300 border-4 border-black px-6 py-2 font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] animate-[scaleIn_0.2s_ease-out]">
+              {toastMsg}
+            </div>
+          )}
 
           <div className="min-h-screen font-serif text-black print:hidden flex overflow-hidden relative selection:bg-gray-300"
                style={{ backgroundColor: '#fff', backgroundImage: 'radial-gradient(#b0b0b0 2px, transparent 2px)', backgroundSize: '16px 16px', backgroundAttachment: 'fixed' }}>
@@ -836,7 +957,7 @@
                       <div><label className="block font-black mb-1">獲得稱號</label><input type="text" className="w-full bg-gray-50 border-2 border-black p-2 font-bold" value={editingItem.highlight} onChange={e => setEditingItem({...editingItem, highlight: e.target.value})} placeholder="例如：紓壓神器、身心充飽電..." /></div>
                     </div>
                     <div className="flex justify-between mt-8 pt-6 border-t-[4px] border-black border-dashed">
-                      {quests.find(q => q.id === editingItem.id) ? <button onClick={() => handleQuestDelete(editingItem.id)} className="font-black text-gray-500 hover:text-black flex items-center gap-1"><Trash2 size={18}/> 刪除</button> : <div></div>}
+                      {quests.find(q => q.id === editingItem.id) ? <button onClick={() => handleQuestDelete(editingItem.id)} className="font-black text-red-600 hover:text-black flex items-center gap-1"><Trash2 size={18}/> 刪除</button> : <div></div>}
                       <div className="flex gap-4">
                         <button onClick={() => setEditingItem(null)} className="font-black px-4 py-2 border-4 border-black hover:bg-gray-200 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">取消</button>
                         <button onClick={handleQuestSave} className="font-black px-6 py-2 bg-black text-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(100,100,100,1)]">存檔 !</button>
@@ -867,11 +988,20 @@
             {isPreviewModalOpen && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm print:hidden">
                 <div className="relative bg-white border-[6px] border-black w-full max-w-4xl flex flex-col shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-black h-[90vh] animate-[scaleIn_0.2s_ease-out]">
-                  <div className="p-4 border-b-4 border-black flex justify-between items-center bg-gray-100 shrink-0">
+                  <div className="p-4 border-b-4 border-black flex flex-wrap justify-between items-center gap-2 bg-gray-100 shrink-0">
                     <h2 className="text-xl font-black flex items-center gap-2">
-                      <FileText size={24} /> 履歷預覽與編輯 <span className="text-sm font-bold text-gray-500 bg-gray-200 px-2 py-1 rounded ml-2">※ 可直接點擊下方紙張修改文字</span>
+                      <FileText size={24} /> 履歷預覽與編輯 <span className="text-xs md:text-sm font-bold text-gray-600 bg-yellow-200 border border-black px-2 py-0.5 ml-1">✨ 已依最新學經歷自動撰寫自傳，可直接點擊紙張微調文字</span>
                     </h2>
-                    <button onClick={() => setIsPreviewModalOpen(false)} className="hover:text-gray-500"><X size={24} strokeWidth={3} /></button>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => { refreshEditableResume(); showToast('已根據最新學經歷重新編寫自傳！✍️'); }} 
+                        className="px-3 py-1 bg-white border-2 border-black font-black text-xs hover:bg-yellow-200 flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                        title="放棄手動微調，根據目前任務與學經歷重新生成"
+                      >
+                        <RefreshCw size={14} /> 重新編寫自傳
+                      </button>
+                      <button onClick={() => setIsPreviewModalOpen(false)} className="hover:text-gray-500"><X size={24} strokeWidth={3} /></button>
+                    </div>
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-300">
@@ -910,58 +1040,70 @@
                  <li>
                    <strong>學歷：</strong> 
                    <div style={{ display: 'inline-block', verticalAlign: 'top' }}>
-                     {basicInfo.education ? basicInfo.education.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) : '未填寫'}
+                     {basicInfo.education ? basicInfo.education.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) : '未填寫（可點擊左上角「主角」新增學歷）'}
                    </div>
                  </li>
                  <li>
                    <strong>經歷：</strong> 
                    <div style={{ display: 'inline-block', verticalAlign: 'top' }}>
-                     {basicInfo.experience ? basicInfo.experience.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) : '未填寫'}
+                     {basicInfo.experience ? basicInfo.experience.split('\n').map((line, i) => <span key={i}>{line}<br/></span>) : '未填寫（可點擊左上角「主角」新增經歷）'}
                    </div>
                  </li>
               </ul>
             </div>
 
             <div style={{ marginBottom: '30px' }}>
-              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>個人自傳</h2>
-              <p style={{ margin: '0', color: '#444', lineHeight: '1.8', textAlign: 'justify' }}>
-                您好，我具備紮實的行政歷練與優異的專案執行力。在過去的職涯中，我不僅穩健達成各項重要里程碑，更具備跨領域的思維（如數位轉型、系統開發），能靈活運用新工具解決實務痛點。此外，我擁有高度的自律性與長遠的規劃能力，能在高壓環境下保持高效產出。未來，我期許能持續發揮我的管理專長與創新思維，為團隊與組織帶來具體的貢獻。
-              </p>
+              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>個人自傳（依學經歷動態生成）</h2>
+              {autoBioParagraphs.map((para, idx) => (
+                <p key={`bio-p-${idx}`} style={{ margin: '0 0 14px 0', color: '#333', lineHeight: '1.85', textAlign: 'justify', textIndent: '2em' }}>
+                  {para}
+                </p>
+              ))}
             </div>
 
             <div style={{ marginBottom: '30px' }}>
-              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>核心競爭力摘要</h2>
-              <ul style={{ paddingLeft: '20px', margin: 0 }}>
-                {mainQuests.filter(q => q.highlight).map(q => (
-                  <li key={`hl-${q.id}`} style={{ marginBottom: '8px', lineHeight: '1.5' }}>
-                    <strong>{q.highlight}：</strong>於「{q.title}」目標中展現。
-                  </li>
-                ))}
-              </ul>
+              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>核心競爭力與專業特質</h2>
+              {highlightedQuests.length > 0 ? (
+                <ul style={{ paddingLeft: '20px', margin: 0 }}>
+                  {highlightedQuests.map(q => (
+                    <li key={`hl-${q.id}`} style={{ marginBottom: '10px', lineHeight: '1.6', color: '#333' }}>
+                      <strong style={{ color: '#000' }}>【{cleanMangaPrefix(q.highlight)}】</strong>：於 {q.date.slice(0, 4)} 年「{cleanMangaPrefix(q.title)}」歷程中具體實踐——{q.description}
+                    </li>
+                  ))}
+                </ul>
+              ) : <p style={{ color: '#666' }}>尚未填寫亮點稱號</p>}
             </div>
 
             <div style={{ marginBottom: '30px' }}>
-              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>重要經歷與里程碑</h2>
+              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #333', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>關鍵職涯歷程與專案實績</h2>
               {mainQuests.length > 0 ? (
                 mainQuests.map(q => (
-                  <div key={`exp-${q.id}`} style={{ marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '5px' }}>
-                      <h3 style={{ fontSize: '16px', margin: 0, color: '#000' }}>{q.title}</h3>
-                      <span style={{ fontSize: '14px', color: '#666' }}>{q.date.replace(/-/g, '/')}</span>
+                  <div key={`exp-${q.id}`} style={{ marginBottom: '18px', paddingBottom: '12px', borderBottom: '1px dashed #ddd' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                      <h3 style={{ fontSize: '16px', margin: 0, color: '#000' }}>■ {cleanMangaPrefix(q.title)}</h3>
+                      <span style={{ fontSize: '14px', color: '#666', fontWeight: 'bold' }}>{q.date.replace(/-/g, '/')}</span>
                     </div>
-                    <p style={{ margin: '5px 0 0 0', color: '#444', lineHeight: '1.6' }}>{q.description}</p>
+                    <p style={{ margin: '4px 0 0 0', color: '#444', lineHeight: '1.7' }}>
+                      {q.description}
+                      {q.highlight ? `（關鍵成果：${cleanMangaPrefix(q.highlight)}）` : ''}
+                    </p>
                   </div>
                 ))
               ) : <p>無紀錄</p>}
             </div>
 
             <div style={{ marginBottom: '30px' }}>
-              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #d97706', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>榮譽與特殊獎勵</h2>
-              {hiddenQuests.length > 0 ? (
+              <h2 style={{ fontSize: '20px', borderLeft: '4px solid #d97706', paddingLeft: '10px', color: '#333', marginBottom: '15px' }}>榮譽事蹟與跨域歷練</h2>
+              {(hiddenQuests.length > 0 || sideQuests.length > 0) ? (
                 <ul style={{ paddingLeft: '20px', margin: 0 }}>
                   {hiddenQuests.map(q => (
-                    <li key={`award-${q.id}`} style={{ marginBottom: '8px', lineHeight: '1.5', color: '#444' }}>
-                      <strong style={{ color: '#000' }}>{q.date.replace(/-/g, '/')} - {q.title}</strong>：{q.description} {q.highlight ? `(${q.highlight})` : ''}
+                    <li key={`award-${q.id}`} style={{ marginBottom: '8px', lineHeight: '1.6', color: '#333' }}>
+                      <strong style={{ color: '#000' }}>🏆 [榮譽肯定] {cleanMangaPrefix(q.title)}（{q.date.slice(0, 7).replace('-', '/')}）</strong>：{q.description} {q.highlight ? `— 展現「${cleanMangaPrefix(q.highlight)}」之特質。` : ''}
+                    </li>
+                  ))}
+                  {sideQuests.map(q => (
+                    <li key={`side-${q.id}`} style={{ marginBottom: '8px', lineHeight: '1.6', color: '#444' }}>
+                      <strong style={{ color: '#222' }}>✦ [跨域與生活實踐] {cleanMangaPrefix(q.title)}（{q.date.slice(0, 7).replace('-', '/')}）</strong>：{q.description}
                     </li>
                   ))}
                 </ul>
